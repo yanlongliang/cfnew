@@ -1,35 +1,36 @@
-name: Sync with upstream
+name: 自动同步上游仓库
 on:
   schedule:
-    - cron: '0 0 * * *'   # 每天 UTC 0 点（北京时间早8点）自动同步
-  workflow_dispatch:       # 允许手动点按钮立即同步
+    - cron: '0 0 * * *'  # 每天 UTC 0点（北京时间早8点）执行
+  workflow_dispatch:    # 支持手动触发同步
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    # 强制使用 Node.js 24，彻底消除弃用警告
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # 拉完整历史，避免合并失败
+      - name: 检出代码
+        uses: actions/checkout@v4  # 配合环境变量，无警告运行
 
-      - name: Set Git user
+      - name: 配置 Git 信息
         run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Add upstream remote
-        run: git remote add upstream https://github.com/原作者/原仓库.git  # 改这里！
+      - name: 添加上游仓库
+        run: git remote add upstream https://github.com/byJoey/cfnew.git
 
-      - name: Fetch and merge
+      - name: 拉取并同步代码
         run: |
           git fetch upstream
           git checkout main
-          git merge upstream/main  # 用 merge 保留历史；想变基可换 git rebase upstream/main
+          # 强制同步上游（不会覆盖你自己的提交，只会合并新增代码）
+          git merge --ff-only upstream/main || git merge upstream/main
 
-      - name: Push back to fork
+      - name: 推送到你的 Fork
         uses: ad-m/github-push-action@master
         with:
           branch: main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
