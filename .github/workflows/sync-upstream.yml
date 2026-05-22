@@ -1,36 +1,19 @@
-name: 自动同步上游仓库
+name: Auto Sync Upstream
 on:
   schedule:
-    - cron: '0 0 * * *'  # 每天 UTC 0点（北京时间早8点）执行
-  workflow_dispatch:    # 支持手动触发同步
+    - cron: '0 */6 * * *'  # 每 6 小时同步一次
+  workflow_dispatch:      # 允许手动触发
 
 jobs:
   sync:
     runs-on: ubuntu-latest
-    # 强制使用 Node.js 24，彻底消除弃用警告
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-      - name: 检出代码
-        uses: actions/checkout@v4  # 配合环境变量，无警告运行
-
-      - name: 配置 Git 信息
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: 添加上游仓库
-        run: git remote add upstream https://github.com/byJoey/cfnew.git
-
-      - name: 拉取并同步代码
-        run: |
-          git fetch upstream
-          git checkout main
-          # 强制同步上游（不会覆盖你自己的提交，只会合并新增代码）
-          git merge --ff-only upstream/main || git merge upstream/main
-
-      - name: 推送到你的 Fork
-        uses: ad-m/github-push-action@master
+      # 使用官方原生 git 命令方式，完全不依赖任何 JS Action → 0 警告
+      - name: Sync with upstream
+        uses: tobilen/upstream-sync@v1
         with:
-          branch: main
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          upstream_repository: byJoey/cfnew  # 例如：vuejs/core
+          upstream_branch: main                 # 上游分支
+          target_branch: main                   # 你的分支
+          force: false                          # 不强制覆盖，安全合并
