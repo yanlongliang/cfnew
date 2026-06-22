@@ -1,19 +1,40 @@
-name: Auto Sync Upstream
+name: Auto Sync Upstream (Native Git)
 on:
   schedule:
     - cron: '0 */6 * * *'  # 每 6 小时同步一次
-  workflow_dispatch:      # 允许手动触发
+  workflow_dispatch:        # 允许手动触发
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      # 使用官方原生 git 命令方式，完全不依赖任何 JS Action → 0 警告
-      - name: Sync with upstream
-        uses: tobilen/upstream-sync@v1
+      # 1. 拉取当前仓库代码
+      - name: Checkout target repository
+        uses: actions/checkout@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          upstream_repository: byJoey/cfnew  # 例如：vuejs/core
-          upstream_branch: main                 # 上游分支
-          target_branch: main                   # 你的分支
-          force: false                          # 不强制覆盖，安全合并
+          ref: main
+          fetch-depth: 0    # 获取完整历史记录，防止合并报错
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # 2. 使用纯原生 Git 命令进行同步
+      - name: Sync with upstream using native git
+        run: |
+          # 配置 Git 用户信息（用于生成合并提交）
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 添加上游仓库并拉取最新代码
+          git remote add upstream https://github.com/byJoey/cfnew.git || true
+          git fetch upstream main
+          
+          # 尝试合并上游分支（不强制覆盖）
+          echo "Attempting to merge upstream/main into main..."
+          git merge upstream/main --no-edit
+          
+          # 如果有更新，则推送到当前仓库
+          if [ $? -eq 0 ]; then
+            echo "Merge successful. Pushing changes..."
+            git push origin main
+          else
+            echo "Merge failed or no new changes to sync."
+          fi
